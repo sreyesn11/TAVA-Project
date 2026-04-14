@@ -1,0 +1,10 @@
+numpy
+opencv-python
+opencv-contrib-python
+matplotlib
+pandas
+scikit-image
+scipy
+jupyter
+rawpy
+Pillow

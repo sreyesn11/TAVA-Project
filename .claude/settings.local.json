@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import rawpy; raw = rawpy.imread\\('c:/Users/User/OneDrive/Desktop/LICORERA DE CALDAS/fotos_raw/IMG_0290.CR3'\\); rgb = raw.postprocess\\(\\); print\\('shape:', rgb.shape, 'dtype:', rgb.dtype\\); raw.close\\(\\)\")"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "source_format": "CR3",
+  "use_rawpy": true,
+  "rawpy_params": {
+    "use_camera_wb": true,
+    "no_auto_bright": false,
+    "output_bps": 8
+  },
+  "resize_for_processing": {
+    "enabled": true,
+    "max_dimension": 2000
+  },
+  "image_folder": "fotos_raw",
+  "extensions": [".CR3", ".cr3", ".CR2", ".cr2", ".raw", ".RAW"],
+  "output_folder": "outputs"
+}
