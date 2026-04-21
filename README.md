@@ -1,25 +1,7 @@
-# Sistema de Medicion Automatizada de Botellas en Imagenes RAW
-### Licorera de Caldas — Demo de Vision por Computador
+# Sistema de Medicio de Botellas en Imagenes RAW
+### Licorera de Caldas —  Vision por Computador
+### Topicos avanzados de visison Artitificial
 
----
-
-## Tabla de contenidos
-
-1. [Contexto y motivacion](#1-contexto-y-motivacion)
-2. [Objetivo del proyecto](#2-objetivo-del-proyecto)
-3. [Estructura del proyecto](#3-estructura-del-proyecto)
-4. [Como funciona el sistema](#4-como-funciona-el-sistema)
-   - 4.1 [Lectura de imagenes RAW (CR3)](#41-lectura-de-imagenes-raw-cr3)
-   - 4.2 [Pipeline baseline](#42-pipeline-baseline)
-   - 4.3 [Pipeline mejorado](#43-pipeline-mejorado)
-   - 4.4 [Medicion geometrica](#44-medicion-geometrica)
-   - 4.5 [Evaluacion comparativa](#45-evaluacion-comparativa)
-5. [Resultados obtenidos](#5-resultados-obtenidos)
-6. [Decisiones tecnicas y por que se tomaron](#6-decisiones-tecnicas-y-por-que-se-tomaron)
-7. [Limitaciones actuales](#7-limitaciones-actuales)
-8. [Como ejecutar el proyecto](#8-como-ejecutar-el-proyecto)
-9. [Dependencias](#9-dependencias)
-10. [Siguientes pasos recomendados](#10-siguientes-pasos-recomendados)
 
 ---
 
@@ -27,9 +9,9 @@
 
 Las lineas de produccion de bebidas necesitan verificar que cada botella cumpla con especificaciones geometricas precisas: altura total, diametro del cuerpo, ancho del cuello, relacion entre secciones, entre otras. Una botella fuera de tolerancia puede causar problemas de sellado, llenado incorrecto, o rechazo en el mercado.
 
-Actualmente este control se hace de forma manual o con equipos industriales costosos. El objetivo de este proyecto es demostrar que es posible extraer medidas geometricas confiables directamente desde fotografias digitales tomadas con una camara Canon (archivos CR3), utilizando unicamente software libre y tecnicas de vision por computador clasicas, sin necesidad de hardware especializado.
+Actualmente este control se hace de forma manual o con equipos industriales costosos. El objetivo de este proyecto es demostrar que es posible extraer medidas geometricas confiables directamente desde fotografias digitales tomadas con una camara Canon (archivos CR3).
 
-El proyecto surge como **demo tecnica** para evaluar la viabilidad del enfoque antes de escalar a un sistema de inspeccion en linea.
+El presente  proyecto surge como **demo tecnica** para evaluar la viabilidad del enfoque antes de escalar a un sistema de inspeccion en linea.
 
 ---
 
@@ -37,7 +19,7 @@ El proyecto surge como **demo tecnica** para evaluar la viabilidad del enfoque a
 
 Construir un sistema modular que:
 
-- Lea imagenes en formato RAW de camara Canon (`.CR3`) directamente desde disco.
+- Lea imagenes en formato RAW de camara Canon (`.CR3`) .
 - Detecte la botella en la imagen y extraiga su contorno.
 - Mida automaticamente las dimensiones geometricas relevantes en pixeles.
 - Compare dos estrategias de procesamiento (baseline vs mejorado) con metricas objetivas.
@@ -45,7 +27,7 @@ Construir un sistema modular que:
 
 ---
 
-## 3. Estructura del proyecto
+## 3. compenentes importantes
 
 ```
 LICORERA DE CALDAS/
@@ -60,33 +42,29 @@ LICORERA DE CALDAS/
 │   ├── IMG_0293.CR3
 │   └── IMG_0294.CR3
 │
-├── notebooks/
-│   └── demo_botellas.ipynb      # Notebook principal ejecutable de punta a punta
 │
-├── outputs/                     # Generado automaticamente al correr el sistema
+├── outputs/                   
 │   ├── dashboard_medidas.png    # Dashboard visual con todas las metricas
 │   ├── comparacion_medidas.png  # Grafica de barras baseline vs mejorado
 │   ├── calidad_borde.png        # Densidad, continuidad y tiempos por imagen
 │   ├── overlay_IMG_029*.png     # Contornos superpuestos imagen por imagen
-│   ├── resumen_medidas.csv      # Tabla completa de todas las medidas
-│   └── resumen_medidas.html     # Misma tabla en formato HTML
+│   └── resumen_medidas.csv      # Tabla completa de todas las medidas
 │
-├── src/
-│   ├── __init__.py
-│   ├── raw_loader.py            # Carga imagenes CR3 con rawpy
-│   ├── preprocessing.py         # Filtros de preprocesamiento
-│   ├── edge_detection.py        # Deteccion de bordes y extraccion de mascara
-│   ├── contour_measurement.py   # Medicion geometrica de la botella
-│   ├── evaluation.py            # Pipelines completos, metricas y graficas
-│   └── utils.py                 # Visualizacion y guardado de resultados
-│
-├── requirements.txt             # Dependencias del proyecto
-└── README.md                    # Este archivo
+└─── src/
+    ├── __init__.py
+    ├── raw_loader.py            # Carga imagenes CR3 con rawpy
+    ├── preprocessing.py         # Filtros de preprocesamiento
+    ├── edge_detection.py        # Deteccion de bordes y extraccion de mascara
+    ├── contour_measurement.py   # Medicion geometrica de la botella
+    ├── evaluation.py            # Pipelines completos, metricas y graficas
+    └── utils.py                 # Visualizacion y guardado de resultados
+
+
 ```
 
 ---
 
-## 4. Como funciona el sistema
+## 4. Funcionamiento
 
 ### 4.1 Lectura de imagenes RAW (CR3)
 
@@ -410,78 +388,9 @@ Las botellas son objetos verticales por naturaleza. Un contorno de fondo, sombra
 
 ---
 
-## 8. Como ejecutar el proyecto
 
-### Requisitos previos
 
-- Python 3.8 o superior
-- Las dependencias listadas en `requirements.txt`
-
-### Instalacion
-
-```bash
-pip install -r requirements.txt
-```
-
-### Ejecutar el notebook
-
-```bash
-cd "LICORERA DE CALDAS"
-jupyter notebook notebooks/demo_botellas.ipynb
-```
-
-Ejecutar todas las celdas en orden de arriba hacia abajo. El notebook esta disenado para correr sin pasos manuales ocultos.
-
-### Ejecutar como script Python
-
-```python
-import sys
-sys.path.insert(0, '.')
-
-from src.raw_loader import load_config, load_images_from_folder
-from src.evaluation import run_baseline, run_improved, build_summary_table
-from src.utils import save_outputs
-
-config = load_config('config/raw_config.json')
-images = load_images_from_folder('fotos_raw', config)
-
-results = []
-for img in images:
-    b = run_baseline(img['image'])
-    i = run_improved(img['image'])
-    results.append({'name': img['name'], 'gray': img['image'],
-                    'baseline': b, 'improved': i})
-
-df = build_summary_table(results)
-save_outputs(df, 'outputs')
-```
-
-### Agregar nuevas imagenes
-
-Colocar los archivos `.CR3` (o `.CR2`, `.RAW`) en la carpeta `fotos_raw/` y volver a ejecutar. No se requiere ninguna otra configuracion.
-
----
-
-## 9. Dependencias
-
-| Paquete | Version minima | Para que se usa |
-|---------|---------------|----------------|
-| `numpy` | 1.21 | Arrays, operaciones numericas |
-| `opencv-python` | 4.5 | Procesamiento de imagen (Canny, morfologia, contornos) |
-| `opencv-contrib-python` | 4.5 | SIFT (detector de keypoints) |
-| `rawpy` | 0.16 | Decodificacion de archivos RAW de camara (CR3, CR2) |
-| `matplotlib` | 3.4 | Generacion de graficas y visualizaciones |
-| `pandas` | 1.3 | Tablas de resultados, exportacion CSV/HTML |
-| `scikit-image` | 0.18 | Funciones auxiliares de procesamiento de imagen |
-| `scipy` | 1.7 | Funciones matematicas y estadisticas |
-| `Pillow` | 8.0 | Lectura/escritura de formatos de imagen estandar |
-| `jupyter` | 1.0 | Ejecucion interactiva del notebook |
-
-Instalar todo con: `pip install -r requirements.txt`
-
----
-
-## 10. Siguientes pasos recomendados
+## 8. Siguientes pasos recomendados
 
 ### Corto plazo (mejoras al sistema actual)
 
@@ -491,22 +400,14 @@ Instalar todo con: `pip install -r requirements.txt`
 
 3. **Tolerancias por modelo:** agregar un archivo `config/modelos_botella.json` con las especificaciones nominales y tolerancias de cada modelo. El sistema podria marcar automaticamente botellas fuera de especificacion.
 
-### Mediano plazo (mejoras de robustez)
+4. **Deteccion multi-botella:** adaptar el sistema para detectar y medir varias botellas por imagen, util para fotografia de lotes.
 
-4. **Calibracion de camara:** usar `cv2.calibrateCamera()` con un patron de damero para obtener los parametros intrinscos de la camara y corregir la distorsion de lente antes de medir.
+## Autores
 
-5. **Segmentacion por deep learning:** entrenar una red U-Net con un dataset pequeno de botellas etiquetadas (~200-500 imagenes). Esto eliminaria la dependencia de parametros de Canny y morfologia, haciendolo robusto a variaciones de fondo e iluminacion.
+- **Edward Fabian Goyeneche Velandia**  
+  - egoyeneche@unal.edu.co
 
-6. **Deteccion multi-botella:** adaptar el sistema para detectar y medir varias botellas por imagen, util para fotografia de lotes.
+- **Samuel Esteban Reyes Nazate**  
+  - sreyesn@unal.edu.co  
 
-### Largo plazo (sistema de produccion)
 
-7. **Integracion en linea:** conectar el sistema a una camara industrial sobre el conveyor belt, con trigger automatico por sensor de presencia.
-
-8. **Dashboard en tiempo real:** interfaz web (Streamlit o FastAPI + React) que muestre las medidas de cada botella en tiempo real y genere alertas cuando una este fuera de tolerancia.
-
-9. **Trazabilidad:** guardar las medidas en una base de datos con timestamp, numero de lote y resultado de inspeccion para auditoria y control estadistico de proceso (SPC).
-
----
-
-*Proyecto desarrollado para Licorera de Caldas como demo de vision por computador aplicada al control de calidad de botellas.*
