@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(python -c ':*)",
-      "Bash(python -c \"import json; nb=json.load\\(open\\('c:/Users/User/OneDrive/Desktop/LICORERA DE CALDAS/notebooks/demo_botellas.ipynb'\\)\\); print\\(f'Notebook valido: {nb[\\\\\"nbformat\\\\\"]} celdas de tipo {set\\(c[\\\\\"cell_type\\\\\"] for c in nb[\\\\\"cells\\\\\"]\\)}, total={len\\(nb[\\\\\"cells\\\\\"]\\)} celdas'\\)\")"
-    ]
-  }
-}
