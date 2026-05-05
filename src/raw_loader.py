@@ -1,7 +1,8 @@
 """
-raw_loader.py
-Carga imagenes RAW de camara (CR3, CR2, etc.) usando rawpy,
-con fallback a lectura binaria para archivos .raw planos.
+raw_loader.py  --  v2
+Carga imagenes RAW de camara (CR3, CR2, etc.) usando rawpy.
+Preserva profundidad de bits original (uint16) y canales RGB.
+NO redimensiona. Normalizacion solo para visualizacion.
 """
 
 import os
@@ -23,43 +24,55 @@ def load_config(config_path: str) -> dict:
         return json.load(f)
 
 
-def load_raw_image(path: str, config: dict) -> np.ndarray:
+def load_raw_image(path: str, config: dict) -> dict:
     """
-    Carga una imagen RAW desde disco.
+    Carga una imagen RAW desde disco preservando informacion original.
 
-    Para CR3/CR2 usa rawpy (LibRaw).
-    Para .raw binario plano usa lectura directa con numpy.
+    v2: retorna dict en lugar de array simple:
+      - image_rgb    : np.ndarray (H, W, 3) uint16 o uint8 segun output_bps
+      - image_display: np.ndarray (H, W) uint8 normalizado SOLO para visualizacion
+      - dtype        : str  'uint16' o 'uint8'
+      - shape        : tuple (H, W, C)
+      - path         : str  ruta del archivo
 
-    Retorna array uint8 en escala de grises (H, W).
+    La imagen_display se obtiene sin modificar image_rgb -- la conversion es
+    una copia independiente para uso exclusivo en visualizacion o en algoritmos
+    que requieren uint8 (ej. cv2.Canny).
     """
     ext = os.path.splitext(path)[1].upper()
-
     if ext in (".CR3", ".CR2", ".NEF", ".ARW", ".DNG") or config.get("use_rawpy", True):
         return _load_with_rawpy(path, config)
     else:
         return _load_plain_raw(path, config)
 
 
-def _load_with_rawpy(path: str, config: dict) -> np.ndarray:
-    """Decodifica un archivo RAW de camara con rawpy."""
+def _load_with_rawpy(path: str, config: dict) -> dict:
+    """
+    Decodifica un archivo RAW de camara con rawpy.
+
+    v2 cambios criticos:
+    - output_bps default = 16 (preserva profundidad de bits original)
+    - resize_for_processing disabled por defecto
+    - Retorna imagen RGB completa SIN convertir a gris
+    """
     if not RAWPY_AVAILABLE:
         raise ImportError("rawpy no esta instalado. Ejecuta: pip install rawpy")
 
     params = config.get("rawpy_params", {})
+    output_bps = params.get("output_bps", 16)  # v2: 16 por defecto
 
-    # Construir parametros de postprocesado
     pp_kwargs = {
         "use_camera_wb": params.get("use_camera_wb", True),
         "no_auto_bright": params.get("no_auto_bright", False),
-        "output_bps": params.get("output_bps", 8),
+        "output_bps": output_bps,
     }
 
     with rawpy.imread(path) as raw:
-        rgb = raw.postprocess(**pp_kwargs)  # uint8 RGB (H, W, 3)
+        rgb = raw.postprocess(**pp_kwargs)  # uint16 (H,W,3) con output_bps=16
 
-    # Reducir resolucion si la imagen es muy grande para procesamiento
+    # v2: NO redimensionar por defecto
     resize_cfg = config.get("resize_for_processing", {})
-    if resize_cfg.get("enabled", True):
+    if resize_cfg.get("enabled", False):  # v2: disabled=False por defecto
         max_dim = resize_cfg.get("max_dimension", 2000)
         h, w = rgb.shape[:2]
         if max(h, w) > max_dim:
@@ -68,15 +81,55 @@ def _load_with_rawpy(path: str, config: dict) -> np.ndarray:
             new_h = int(h * scale)
             rgb = cv2.resize(rgb, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
-    # Convertir a escala de grises
-    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-    return gray
+    # Normalizacion SOLO para visualizacion (copia independiente)
+    display = _normalize_for_display(rgb)
+    dtype_name = "uint16" if rgb.dtype == np.uint16 else "uint8"
+
+    return {
+        "image_rgb":     rgb,
+        "image_display": display,
+        "dtype":         dtype_name,
+        "shape":         rgb.shape,
+        "path":          path,
+    }
 
 
-def _load_plain_raw(path: str, config: dict) -> np.ndarray:
-    """Lee un archivo .raw binario plano con numpy."""
-    width = config.get("width")
-    height = config.get("height")
+def _normalize_for_display(img: np.ndarray) -> np.ndarray:
+    """
+    Convierte imagen a uint8 escala de grises SOLO para visualizacion.
+    La imagen original NO se modifica.
+
+    Mapeo:
+      uint16  -> /257 -> uint8  (65535 / 257 = 255, sin recorte)
+      float   -> min-max -> uint8
+      uint8   -> copia directa
+    """
+    if img.dtype == np.uint8:
+        out = img if img.ndim == 2 else cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        return out.copy()
+    elif img.dtype == np.uint16:
+        display = (img / 257).astype(np.uint8)
+        if display.ndim == 3:
+            display = cv2.cvtColor(display, cv2.COLOR_RGB2GRAY)
+        return display
+    else:
+        mn, mx = float(img.min()), float(img.max())
+        if mx > mn:
+            display = ((img - mn) / (mx - mn) * 255).astype(np.uint8)
+        else:
+            display = np.zeros(img.shape[:2], dtype=np.uint8)
+        if display.ndim == 3:
+            display = cv2.cvtColor(display, cv2.COLOR_RGB2GRAY)
+        return display
+
+
+def _load_plain_raw(path: str, config: dict) -> dict:
+    """
+    Lee un archivo .raw binario plano con numpy.
+    v2: preserva dtype original sin normalizar a uint8.
+    """
+    width    = config.get("width")
+    height   = config.get("height")
     channels = config.get("channels", 1)
     dtype_str = config.get("dtype", "uint8")
     byte_order = config.get("byte_order", "little")
@@ -88,8 +141,8 @@ def _load_plain_raw(path: str, config: dict) -> np.ndarray:
         )
 
     dtype_map = {
-        "uint8": np.uint8,
-        "uint16": np.uint16,
+        "uint8":   np.uint8,
+        "uint16":  np.uint16,
         "float32": np.float32,
         "float64": np.float64,
     }
@@ -110,7 +163,6 @@ def _load_plain_raw(path: str, config: dict) -> np.ndarray:
 
     data = np.fromfile(path, dtype=dtype)
 
-    # Ajustar orden de bytes si es big-endian
     if byte_order == "big" and dtype != np.uint8:
         data = data.byteswap().newbyteorder()
 
@@ -119,28 +171,25 @@ def _load_plain_raw(path: str, config: dict) -> np.ndarray:
     else:
         img = data.reshape((height, width, channels))
 
-    # Normalizar uint16 a uint8 para procesamiento
-    if dtype == np.uint16:
-        img = (img / 65535.0 * 255).astype(np.uint8)
-    elif dtype in (np.float32, np.float64):
-        img_min, img_max = img.min(), img.max()
-        if img_max > img_min:
-            img = ((img - img_min) / (img_max - img_min) * 255).astype(np.uint8)
-        else:
-            img = np.zeros_like(img, dtype=np.uint8)
+    # v2: NO normalizar a uint8 -- preservar dtype original
+    display = _normalize_for_display(img)
 
-    # Si es color, convertir a gris
-    if channels == 3:
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    return img
+    return {
+        "image_rgb":     img,
+        "image_display": display,
+        "dtype":         dtype_str,
+        "shape":         img.shape,
+        "path":          path,
+    }
 
 
 def load_images_from_folder(folder: str, config: dict, extensions: tuple = None) -> list:
     """
     Carga todas las imagenes RAW de una carpeta.
 
-    Retorna lista de dicts: {'name': str, 'path': str, 'image': np.ndarray}
+    Retorna lista de dicts con claves:
+      'name', 'path', 'image_rgb', 'image_display', 'dtype', 'shape'
+      'image' (alias de image_display para compatibilidad con v1)
     """
     if extensions is None:
         extensions = tuple(
@@ -168,9 +217,19 @@ def load_images_from_folder(folder: str, config: dict, extensions: tuple = None)
         fpath = os.path.join(folder, fname)
         print(f"  Cargando: {fname} ...", end=" ")
         try:
-            img = load_raw_image(fpath, config)
-            results.append({"name": fname, "path": fpath, "image": img})
-            print(f"OK  ({img.shape[1]}x{img.shape[0]} px)")
+            img_data = load_raw_image(fpath, config)
+            h, w = img_data["image_rgb"].shape[:2]
+            results.append({
+                "name":          fname,
+                "path":          fpath,
+                "image_rgb":     img_data["image_rgb"],
+                "image_display": img_data["image_display"],
+                "dtype":         img_data["dtype"],
+                "shape":         img_data["shape"],
+                # Alias backward-compat: 'image' apunta a display (uint8 gray)
+                "image":         img_data["image_display"],
+            })
+            print(f"OK  ({w}x{h} px, {img_data['dtype']})")
         except Exception as e:
             print(f"ERROR: {e}")
 

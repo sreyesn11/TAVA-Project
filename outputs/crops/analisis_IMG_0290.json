@@ -1,0 +1,83 @@
+{
+  "instruction": "Recortar la imagen RAW usando el rectangulo detectado en la silueta de la botella. Aplicar raw.rect_xyxy sobre la imagen original preservada. El recorte es opcional: la imagen original NO debe ser modificada.",
+  "crop_optional": true,
+  "raw": {
+    "width": 1795,
+    "height": 4185,
+    "path": "IMG_0290.CR3",
+    "rect": {
+      "x": 0,
+      "y": 79,
+      "w": 1795,
+      "h": 4106
+    },
+    "rect_xyxy": {
+      "x_min": 0,
+      "y_min": 79,
+      "x_max": 1795,
+      "y_max": 4185
+    }
+  },
+  "scale": {
+    "x": 1.0,
+    "y": 1.0
+  },
+  "metrics": {
+    "area_px": 7370270,
+    "aspect_ratio": 0.4372,
+    "coverage_frac": 0.9811,
+    "score": 0.8766
+  },
+  "metadata": {
+    "path": "C:\\Users\\User\\OneDrive\\Desktop\\LICORERA DE CALDAS\\fotos_raw\\IMG_0290.CR3",
+    "time_total_s": 2.1662
+  },
+  "bottle_measures": {
+    "height_crop_px": 4185,
+    "width_crop_px": 1795,
+    "height_bottle_px": 4106,
+    "width_max_px": 1795,
+    "width_min_px": 15,
+    "width_mean_px": 1244.18,
+    "aspect_ratio": 0.4372,
+    "zona_cuello": {
+      "promedio_px": 576.14,
+      "maximo_px": 829,
+      "minimo_px": 15
+    },
+    "zona_hombro": {
+      "promedio_px": 1284.38,
+      "maximo_px": 1445,
+      "minimo_px": 829
+    },
+    "zona_cuerpo": {
+      "promedio_px": 1394.68,
+      "maximo_px": 1446,
+      "minimo_px": 1338
+    },
+    "zona_base": {
+      "promedio_px": 1543.58,
+      "maximo_px": 1795,
+      "minimo_px": 1327
+    },
+    "ancho_10pct_px": 551,
+    "ancho_20pct_px": 829,
+    "ancho_25pct_px": 1249,
+    "ancho_30pct_px": 1417,
+    "ancho_40pct_px": 1443,
+    "ancho_50pct_px": 1413,
+    "ancho_60pct_px": 1387,
+    "ancho_70pct_px": 1360,
+    "ancho_75pct_px": 1348,
+    "ancho_80pct_px": 1338,
+    "ancho_90pct_px": 1795,
+    "ratio_cuello_cuerpo": 0.5733,
+    "simetria_vertical": 0.8769,
+    "contour_bbox_in_crop": [
+      0,
+      79,
+      1795,
+      4106
+    ]
+  }
+}

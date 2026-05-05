@@ -1,0 +1,51 @@
+{
+  "instruction": "Recortar la imagen RAW usando el rectangulo detectado en la silueta de la botella. Aplicar raw.rect_xyxy sobre la imagen original preservada. El recorte es opcional: la imagen original NO debe ser modificada.",
+  "crop_optional": true,
+  "raw": {
+    "width": 6984,
+    "height": 4660,
+    "path": "IMG_0293.CR3",
+    "rect": {
+      "x": 2802,
+      "y": 231,
+      "w": 1795,
+      "h": 4185
+    },
+    "rect_xyxy": {
+      "x_min": 2802,
+      "y_min": 231,
+      "x_max": 4597,
+      "y_max": 4416
+    }
+  },
+  "reference": {
+    "width": 1027,
+    "height": 687,
+    "rect": {
+      "x": 412,
+      "y": 34,
+      "w": 264,
+      "h": 617
+    },
+    "rect_xyxy": {
+      "x_min": 412,
+      "y_min": 34,
+      "x_max": 676,
+      "y_max": 651
+    }
+  },
+  "scale": {
+    "x": 6.80038948,
+    "y": 6.78311499
+  },
+  "metrics": {
+    "area_px": 7512075,
+    "aspect_ratio": 0.4289,
+    "coverage_frac": 0.2308,
+    "score": 0.775
+  },
+  "metadata": {
+    "path": "C:\\Users\\User\\OneDrive\\Desktop\\LICORERA DE CALDAS\\fotos_raw\\IMG_0293.CR3",
+    "time_total_s": 17.1048
+  }
+}
