@@ -1,0 +1,6 @@
+imagen,MAE,RMSE,MAPE_pct,max_error,nota
+IMG_0290,0.060013,0.083407,10.4742,0.265165,"Metricas sobre firma normalizada [0,1]. Para mm reales, proveer px_per_mm."
+IMG_0291,0.054789,0.078474,9.3469,0.254646,"Metricas sobre firma normalizada [0,1]. Para mm reales, proveer px_per_mm."
+IMG_0292,0.057001,0.080229,9.8313,0.259286,"Metricas sobre firma normalizada [0,1]. Para mm reales, proveer px_per_mm."
+IMG_0293,0.056529,0.079489,9.7328,0.253226,"Metricas sobre firma normalizada [0,1]. Para mm reales, proveer px_per_mm."
+IMG_0294,0.058262,0.079834,10.2009,0.26181,"Metricas sobre firma normalizada [0,1]. Para mm reales, proveer px_per_mm."

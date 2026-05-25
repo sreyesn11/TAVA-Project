@@ -28,6 +28,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import cv2
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -38,14 +39,19 @@ from src.raw_loader    import load_config, load_images_from_folder
 from src.evaluation    import (run_full_pipeline_v2, run_baseline, run_improved,
                                 save_crop_json, plot_contour_overlay)
 from src.utils         import plot_full_pipeline_v2, plot_bottle_measurements
+from src.signature     import (extract_radial_signature, save_signature_csv,
+                                plot_signature, compare_with_reference,
+                                save_comparison_summary)
 
 OUTPUT_ROOT   = os.path.join(PROJECT_ROOT, "outputs")
 OUTPUT_FULL   = os.path.join(OUTPUT_ROOT, "full")
 OUTPUT_CROPS  = os.path.join(OUTPUT_ROOT, "crops")
+OUTPUT_FIRMA  = os.path.join(OUTPUT_ROOT, "firma")
 CONFIG_PATH   = os.path.join(PROJECT_ROOT, "config", "raw_config.json")
 IMAGE_FOLDER  = os.path.join(PROJECT_ROOT, "fotos_raw")
+REF_FIRMA_PATH = os.path.join(PROJECT_ROOT, "firma_botella", "firma_completa_0_360.csv")
 
-for d in (OUTPUT_ROOT, OUTPUT_FULL, OUTPUT_CROPS):
+for d in (OUTPUT_ROOT, OUTPUT_FULL, OUTPUT_CROPS, OUTPUT_FIRMA):
     os.makedirs(d, exist_ok=True)
 
 
@@ -216,16 +222,71 @@ def _overlay_borders(display_gray: np.ndarray,
     plt.close(fig)
 
 
-def analyze_crops(single=None, preview=False):
+def _run_signature(silhouette_mask: np.ndarray,
+                    stem: str,
+                    summary_rows: list) -> None:
+    """
+    Extrae la firma radial de la silueta, la guarda como CSV y grafica,
+    la compara con la firma de referencia y acumula el resultado en summary_rows.
+    """
+    if silhouette_mask is None or silhouette_mask.max() == 0:
+        print("  [FIRMA] Mascara vacia, firma no extraida.")
+        return
+
+    print("  Extrayendo firma radial...")
+    try:
+        angles, distances, centroid = extract_radial_signature(silhouette_mask)
+    except ValueError as exc:
+        print(f"  [FIRMA] Error: {exc}")
+        return
+
+    # Guardar CSV de la firma detectada
+    csv_path = os.path.join(OUTPUT_FIRMA, f"firma_modelo_{stem}.csv")
+    save_signature_csv(angles, distances, csv_path)
+    print(f"  Firma CSV: {os.path.basename(csv_path)}")
+
+    # Cargar firma de referencia (si existe)
+    ref_df = None
+    if os.path.isfile(REF_FIRMA_PATH):
+        ref_df = pd.read_csv(REF_FIRMA_PATH)
+    else:
+        print(f"  [FIRMA] Referencia no encontrada: {REF_FIRMA_PATH}")
+
+    # Grafica de la firma (con o sin referencia)
+    png_path = os.path.join(OUTPUT_FIRMA, f"grafica_firma_{stem}.png")
+    fig = plot_signature(angles, distances, ref_df=ref_df,
+                          img_name=stem, out_path=png_path)
+    plt.close(fig)
+    print(f"  Firma PNG: {os.path.basename(png_path)}")
+
+    # Comparacion con referencia
+    if ref_df is not None:
+        metrics = compare_with_reference(angles, distances, ref_df)
+        print(f"  MAE={metrics['MAE']:.4f}  RMSE={metrics['RMSE']:.4f}"
+              f"  MAPE={metrics['MAPE_pct']:.2f}%  max_err={metrics['max_error']:.4f}"
+              "  (escala norm. [0,1])")
+        row = {"imagen": stem}
+        row.update(metrics)
+        summary_rows.append(row)
+    else:
+        summary_rows.append({"imagen": stem,
+                               "MAE": None, "RMSE": None,
+                               "MAPE_pct": None, "max_error": None,
+                               "nota": "sin referencia"})
+
+
+def analyze_crops(single=None, preview=False, signature=False):
     """
     Lee los JSONs de recorte (outputs/crops/recorte_*.json), aplica el recorte
     sobre cada RAW y ejecuta:
       - Pipeline completo (bordes + silueta + medidas)
       - Overlay de bordes baseline (azul) vs mejorado (naranja) sobre el recorte
-    Guarda todo en outputs/crops/.
+      - (opcional, --signature) Firma radial y comparacion con referencia
+    Guarda todo en outputs/crops/ y, si signature=True, en outputs/firma/.
     """
     import rawpy
     import imageio.v3 as iio
+    firma_summary_rows = []
 
     json_files = sorted([
         f for f in os.listdir(OUTPUT_CROPS)
@@ -369,15 +430,39 @@ def analyze_crops(single=None, preview=False):
             save_crop_json(crop_json,
                            os.path.join(OUTPUT_CROPS, f"analisis_{stem}.json"))
 
+        # -- Firma radial (opcional, activada con --signature) ----------------
+        if signature:
+            sil_mask = result.get("silhouette_mask")
+            # Recortar la silueta al bbox detectado para aislar solo la botella
+            bbox = result.get("bbox_consensus")
+            if sil_mask is not None and bbox is not None:
+                bx, by, bw_, bh_ = bbox
+                sil_for_sig = sil_mask[by:by+bh_, bx:bx+bw_]
+            else:
+                sil_for_sig = sil_mask
+            _run_signature(sil_for_sig, stem, firma_summary_rows)
+
         t_total = time.time() - t0
         print(f"  tiempo  : {t_total:.1f}s")
         print(f"  outputs : overlay_bordes_{stem}.png")
         print(f"            overlay_bordes_v23_{stem}.png")
         print(f"            pipeline_crop_{stem}.png")
-        print(f"            medidas_crop_{stem}.png\n")
+        print(f"            medidas_crop_{stem}.png")
+        if signature:
+            print(f"            firma_modelo_{stem}.csv  (outputs/firma/)")
+            print(f"            grafica_firma_{stem}.png  (outputs/firma/)")
+        print()
+
+    # -- Resumen de comparacion de firmas (si se pidio --signature) -----------
+    if signature and firma_summary_rows:
+        resumen_path = os.path.join(OUTPUT_FIRMA, "resumen_firma.csv")
+        save_comparison_summary(firma_summary_rows, resumen_path)
+        print(f"  Resumen firmas: {resumen_path}")
 
     print(f"{'='*60}")
     print(f"  Listo. Outputs en: {OUTPUT_CROPS}")
+    if signature:
+        print(f"  Firmas en      : {OUTPUT_FIRMA}")
     print(f"{'='*60}\n")
 
 
@@ -393,13 +478,21 @@ if __name__ == "__main__":
                         help="Procesar solo una imagen (ej: IMG_0293)")
     parser.add_argument("--analyze-crops", action="store_true",
                         help="Leer JSONs y analizar recortes")
+    parser.add_argument("--signature",    action="store_true",
+                        help="Extraer firma radial y comparar con referencia "
+                             "(requiere --analyze-crops; salida en outputs/firma/)")
     args = parser.parse_args()
+
+    if args.signature and not args.analyze_crops:
+        print("[INFO] --signature implica --analyze-crops. Activando automaticamente.")
+        args.analyze_crops = True
 
     # Migrar archivos existentes al subfolder correcto
     migrate_existing_outputs()
 
     if args.analyze_crops:
-        analyze_crops(single=args.image, preview=args.preview)
+        analyze_crops(single=args.image, preview=args.preview,
+                      signature=args.signature)
     else:
         ref = None
         if args.ref:
