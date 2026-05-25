@@ -4,10 +4,10 @@
   "rawpy_params": {
     "use_camera_wb": true,
     "no_auto_bright": false,
-    "output_bps": 8
+    "output_bps": 16
   },
   "resize_for_processing": {
-    "enabled": true,
+    "enabled": false,
     "max_dimension": 2000
   },
   "image_folder": "fotos_raw",
