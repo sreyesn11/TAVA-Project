@@ -206,6 +206,176 @@ def plot_signature(angles: np.ndarray, distances: np.ndarray,
     return fig
 
 
+# ── VISUALIZACION PASO A PASO ─────────────────────────────────────────────────
+
+def plot_signature_extraction(mask: np.ndarray,
+                               angles: np.ndarray,
+                               distances: np.ndarray,
+                               centroid: tuple,
+                               img_name: str = "",
+                               out_path: str = None,
+                               ray_step: int = 15,
+                               max_display_px: int = 700) -> plt.Figure:
+    """
+    Visualizacion paso a paso de la extraccion de firma radial.
+
+    Paneles:
+      1  Silueta original (mascara de entrada, con posibles huecos)
+      2  Mascara rellena + centroide geometrico marcado
+      3  Rayos lanzados desde el centroide (cada ray_step grados)
+      4  Firma radial cartesiana (distancia al borde en px vs angulo)
+      5  Firma radial polar (contorno de la botella visto desde el centroide)
+
+    Parametros
+    ----------
+    mask          : mascara binaria original ANTES de rellenar
+    angles        : angulos en grados (360 valores a paso 1, de extract_radial_signature)
+    distances     : distancias en pixeles al borde (de extract_radial_signature)
+    centroid      : (cx, cy) calculado sobre la mascara rellena
+    ray_step      : cada cuantos grados dibujar un rayo en el panel 3 (default 15)
+    max_display_px: lado maximo para display — evita figuras de 6000 px
+    """
+    filled = _fill_mask(mask)
+    cx, cy = centroid
+
+    # ── Downsampling para display ─────────────────────────────────────────────
+    h_f, w_f = filled.shape
+    scale = min(1.0, max_display_px / max(h_f, w_f, 1))
+    if scale < 1.0:
+        new_h = max(1, int(h_f * scale))
+        new_w = max(1, int(w_f * scale))
+        filled_d = cv2.resize(filled, (new_w, new_h), interpolation=cv2.INTER_NEAREST)
+        mask_d   = cv2.resize(
+            (mask > 0).astype(np.uint8) * 255, (new_w, new_h),
+            interpolation=cv2.INTER_NEAREST
+        )
+        cxd, cyd = cx * scale, cy * scale
+        dist_d   = distances * scale
+    else:
+        filled_d = filled
+        mask_d   = (mask > 0).astype(np.uint8) * 255
+        cxd, cyd = cx, cy
+        dist_d   = distances
+
+    dh, dw = filled_d.shape
+
+    # ── Layout 2×3 con GridSpec ───────────────────────────────────────────────
+    fig = plt.figure(figsize=(19, 11))
+    gs  = fig.add_gridspec(2, 3, hspace=0.45, wspace=0.32,
+                           left=0.04, right=0.97, top=0.89, bottom=0.07)
+    ax1 = fig.add_subplot(gs[0, 0])
+    ax2 = fig.add_subplot(gs[0, 1])
+    ax3 = fig.add_subplot(gs[0, 2])
+    ax4 = fig.add_subplot(gs[1, :2])
+    ax5 = fig.add_subplot(gs[1, 2], projection='polar')
+
+    # ── Panel 1: Silueta original ─────────────────────────────────────────────
+    ax1.imshow(mask_d, cmap='gray', interpolation='nearest')
+    ax1.set_title("① Silueta detectada\n(máscara de entrada)", fontweight='bold', fontsize=10)
+    ax1.axis('off')
+
+    # ── Panel 2: Mascara rellena + centroide ──────────────────────────────────
+    ax2.imshow(filled_d, cmap='gray', interpolation='nearest')
+    ax2.plot(cxd, cyd, 'r+', markersize=20, markeredgewidth=2.5)
+    ax2.plot(cxd, cyd, 'ro', markersize=8,
+             markerfacecolor='red', markeredgecolor='white', markeredgewidth=1.5,
+             label=f'Centroide ({cx:.0f}, {cy:.0f}) px')
+    ax2.legend(loc='lower right', fontsize=7.5, framealpha=0.75)
+    ax2.set_title("② Máscara rellena\n+ centroide geométrico (•)", fontweight='bold', fontsize=10)
+    ax2.axis('off')
+
+    # ── Panel 3: Rayos desde el centroide ─────────────────────────────────────
+    # Fondo azul oscuro para que los rayos multicolor destaquen sobre la silueta
+    overlay = np.zeros((dh, dw, 3), dtype=np.uint8)
+    overlay[filled_d > 0]  = [25, 45, 80]
+    overlay[filled_d == 0] = [10, 10, 13]
+    ax3.imshow(overlay, interpolation='nearest')
+
+    cmap_rays   = plt.cm.hsv
+    sampled_idx = np.arange(0, len(angles), ray_step)
+
+    for idx in sampled_idx:
+        ang = float(angles[idx])
+        d   = dist_d[idx]
+        if d == 0:
+            continue
+        rad = np.deg2rad(ang)
+        ex  = cxd + np.cos(rad) * d
+        ey  = cyd + (-np.sin(rad)) * d          # eje Y invertido en imagen
+        col = cmap_rays(ang / 360.0)
+        ax3.plot([cxd, ex], [cyd, ey], color=col, linewidth=1.1, alpha=0.88)
+        ax3.plot(ex, ey, 'o', color=col, markersize=4, alpha=0.95,
+                 markeredgecolor='white', markeredgewidth=0.4)
+
+    # Centroide encima de los rayos
+    ax3.plot(cxd, cyd, 'w+', markersize=18, markeredgewidth=2.5)
+    ax3.plot(cxd, cyd, 'wo', markersize=7,
+             markerfacecolor='white', markeredgecolor='#aaa', markeredgewidth=1.5)
+
+    # Etiquetas de angulos cardinales
+    ang_step = float(angles[1] - angles[0]) if len(angles) > 1 else 1.0
+    for lang, ltxt in zip([0, 90, 180, 270],
+                          ['0°\n(der)', '90°\n(arr)', '180°\n(izq)', '270°\n(abj)']):
+        idx_l = int(round(lang / ang_step)) % len(angles)
+        r_lbl = dist_d[idx_l] * 1.22 if dist_d[idx_l] > 0 else float(max(dist_d)) * 0.5
+        rad_l = np.deg2rad(lang)
+        lx = float(np.clip(cxd + np.cos(rad_l) * r_lbl, 4, dw - 4))
+        ly = float(np.clip(cyd + (-np.sin(rad_l)) * r_lbl, 4, dh - 4))
+        ax3.text(lx, ly, ltxt, ha='center', va='center',
+                 fontsize=7.5, color='yellow', fontweight='bold')
+
+    ax3.set_xlim(0, dw)
+    ax3.set_ylim(dh, 0)          # mantener orientacion de imagen (Y hacia abajo)
+    ax3.set_title(f"③ Lanzamiento de rayos\n(desde centroide, cada {ray_step}°)",
+                  fontweight='bold', fontsize=10)
+    ax3.axis('off')
+
+    # ── Panel 4: Firma cartesiana ─────────────────────────────────────────────
+    ax4.plot(angles, distances, color='#4472C4', linewidth=2, label='Firma detectada')
+    ax4.fill_between(angles, 0, distances, alpha=0.14, color='#4472C4')
+    ax4.set_xlabel("Ángulo (grados)", fontsize=10)
+    ax4.set_ylabel("Distancia al borde (píxeles)", fontsize=10)
+    ax4.set_title("④ Firma radial resultante  (distancia al borde por ángulo)",
+                  fontweight='bold', fontsize=10)
+    ax4.set_xticks(np.arange(0, 361, 45))
+    ax4.set_xlim(0, 359)
+    ax4.grid(True, alpha=0.35)
+
+    ymax = float(distances.max())
+    for lang, ltxt in zip(
+        [0, 90, 180, 270],
+        ['0°\n(derecha)', '90°\n(arriba / cuello)', '180°\n(izquierda)', '270°\n(abajo / base)']
+    ):
+        ax4.axvline(lang, color='#bbb', linewidth=0.85, linestyle='--', alpha=0.7)
+        ax4.text(lang + 3, ymax * 0.97, ltxt, fontsize=7.5, color='#666', va='top')
+
+    ax4.legend(fontsize=9, loc='upper right')
+
+    # ── Panel 5: Firma polar ──────────────────────────────────────────────────
+    theta  = np.deg2rad(np.append(angles, angles[0]))   # cerrar poligono
+    r_plot = np.append(distances, distances[0])
+    ax5.plot(theta, r_plot, color='#4472C4', linewidth=1.6)
+    ax5.fill(theta, r_plot, alpha=0.22, color='#4472C4')
+    ax5.set_theta_zero_location('E')     # 0 deg a la derecha, igual que convencion del codigo
+    ax5.set_theta_direction(1)           # counter-clockwise: 90 deg apunta arriba
+    ax5.set_title("⑤ Vista polar\n(contorno desde centroide)",
+                  fontweight='bold', fontsize=10, pad=13)
+    ax5.tick_params(labelsize=7.5)
+
+    # ── Titulo global ──────────────────────────────────────────────────────────
+    fig.suptitle(
+        f"Extracción de firma radial  ·  {img_name}\n"
+        "Lanzamiento de rayos desde centroide geométrico sobre máscara de silueta rellena",
+        fontsize=12, fontweight='bold'
+    )
+
+    if out_path:
+        os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+        fig.savefig(out_path, dpi=150, bbox_inches='tight')
+
+    return fig
+
+
 # ── COMPARACION CON REFERENCIA ────────────────────────────────────────────────
 
 def compare_with_reference(sig_angles: np.ndarray,

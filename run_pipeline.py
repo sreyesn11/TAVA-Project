@@ -40,7 +40,8 @@ from src.evaluation    import (run_full_pipeline_v2, run_baseline, run_improved,
                                 save_crop_json, plot_contour_overlay)
 from src.utils         import plot_full_pipeline_v2, plot_bottle_measurements
 from src.signature     import (extract_radial_signature, save_signature_csv,
-                                plot_signature, compare_with_reference,
+                                plot_signature, plot_signature_extraction,
+                                compare_with_reference,
                                 save_comparison_summary)
 
 OUTPUT_ROOT   = os.path.join(PROJECT_ROOT, "outputs")
@@ -244,6 +245,15 @@ def _run_signature(silhouette_mask: np.ndarray,
     csv_path = os.path.join(OUTPUT_FIRMA, f"firma_modelo_{stem}.csv")
     save_signature_csv(angles, distances, csv_path)
     print(f"  Firma CSV: {os.path.basename(csv_path)}")
+
+    # Visualizacion paso a paso de la extraccion (silueta → relleno → rayos → firma)
+    ext_png_path = os.path.join(OUTPUT_FIRMA, f"extraccion_firma_{stem}.png")
+    fig = plot_signature_extraction(
+        silhouette_mask, angles, distances, centroid,
+        img_name=stem, out_path=ext_png_path
+    )
+    plt.close(fig)
+    print(f"  Extraccion PNG: {os.path.basename(ext_png_path)}")
 
     # Cargar firma de referencia (si existe)
     ref_df = None
@@ -449,8 +459,9 @@ def analyze_crops(single=None, preview=False, signature=False):
         print(f"            pipeline_crop_{stem}.png")
         print(f"            medidas_crop_{stem}.png")
         if signature:
-            print(f"            firma_modelo_{stem}.csv  (outputs/firma/)")
-            print(f"            grafica_firma_{stem}.png  (outputs/firma/)")
+            print(f"            firma_modelo_{stem}.csv      (outputs/firma/)")
+            print(f"            extraccion_firma_{stem}.png  (outputs/firma/)")
+            print(f"            grafica_firma_{stem}.png     (outputs/firma/)")
         print()
 
     # -- Resumen de comparacion de firmas (si se pidio --signature) -----------
